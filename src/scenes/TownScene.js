@@ -97,7 +97,8 @@ export class TownScene extends Phaser.Scene {
 
   followPlayer() {
     const camera = this.cameras.main;
-    const lookAhead = Math.min(24, camera.height/camera.zoom*.12);
+    const visibleHeight = camera.height / camera.zoom;
+    const lookAhead = Phaser.Math.Clamp(235 - visibleHeight, 22, 42);
     camera.centerOn(this.body.center.x,this.body.bottom-lookAhead);
   }
 

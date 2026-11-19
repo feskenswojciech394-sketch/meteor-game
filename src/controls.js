@@ -128,7 +128,7 @@ export class GameUI {
     this.objective.hidden = !goal;
     if (!goal) return;
     const done = this.completed.has(goal.npc);
-    document.getElementById('objective-label').textContent = done ? '自由探索' : '当前目标';
+    document.getElementById('objective-label').textContent = done ? '交谈完成' : '当前目标';
     document.getElementById('objective-text').textContent = done ? goal.done : goal.text;
   }
 

@@ -19,7 +19,8 @@ function bindFullscreen() {
   };
   button.addEventListener('click', async () => {
     try {
-      if (document.fullscreenElement) await document.exitFullscreen();
+      if (document.body.classList.contains('immersive')) document.body.classList.remove('immersive');
+      else if (document.fullscreenElement) await document.exitFullscreen();
       else if (root.requestFullscreen && document.fullscreenEnabled) await root.requestFullscreen();
       else document.body.classList.toggle('immersive');
     } catch {

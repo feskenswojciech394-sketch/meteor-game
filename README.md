@@ -27,6 +27,7 @@ python3 -m http.server 8000
 | `assets/world.json`、`assets/maps/` | 地图索引与地图数据 |
 | `assets/dialogues/town.json` | 对话 ID 对应的逐句台词 |
 | `assets/vendor/`、`assets/icons/` | Phaser 3.90.0 Arcade Physics 发行版及其 MIT 许可、PWA 图标 |
+| `assets/fonts/` | 随游戏提供的中文字体子集与 OFL 许可，新剧情也可使用系统字体 |
 | `manifest.json`、`sw.js` | 安装信息与离线缓存 |
 | `.github/workflows/pages.yml`、`tests/smoke.cjs` | Pages 发布与浏览器试玩检查 |
 

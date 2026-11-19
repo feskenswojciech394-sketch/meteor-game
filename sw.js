@@ -7,6 +7,7 @@ const CORE = [
   './src/controls.js', './src/scenes/TownScene.js', './src/art/pixels.js',
   './src/art/terrain.js', './src/art/scenery.js', './src/art/actors.js', './src/art/icons.js',
   './assets/vendor/phaser-arcade-physics-3.90.0.min.js',
+  './assets/fonts/town-regular.woff2', './assets/fonts/town-bold.woff2',
   './assets/icons/meteor-192.png', './assets/icons/meteor-512.png', './assets/world.json'
 ];
 

@@ -10,6 +10,7 @@ async function ready(page) {
   await page.goto(url);
   await page.waitForSelector('#loading', {state:'hidden', timeout:20000});
   await page.waitForSelector('#game canvas');
+  await page.evaluate(() => document.fonts.ready.then(() => true));
 }
 
 async function snapshot(page, name) {

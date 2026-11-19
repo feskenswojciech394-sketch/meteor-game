@@ -30,6 +30,7 @@ jobs:
           cp -R index.html manifest.json sw.js src assets "$RUNNER_TEMP/pages/meteor-game/"
           sed -i "s/^const BUILD = 'development';/const BUILD = '$GITHUB_SHA';/" "$RUNNER_TEMP/pages/meteor-game/sw.js"
       - name: Check controls, phone layouts and offline startup
+        timeout-minutes: 5
         env:
           NODE_PATH: ${{ runner.temp }}/meteor-qa/node_modules
           METEOR_QA_SHOTS: ${{ runner.temp }}/meteor-screens
