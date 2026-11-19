@@ -1,4 +1,3 @@
-// Run against the staged site so relative URLs and the release service worker are exercised.
 const assert = require('node:assert/strict');
 const { mkdir } = require('node:fs/promises');
 const { join } = require('node:path');
@@ -15,6 +14,25 @@ async function ready(page) {
 
 async function snapshot(page, name) {
   if (shots) await page.screenshot({path:join(shots,name+'.png')});
+}
+
+// A tiny fixture isolates control/collision checks from edits to the shipped maps and story.
+async function enterFixture(page) {
+  const map = {
+    name:'测试街道', chapter:'测试', day:'', time:'上午', tileSize:16, seed:1,
+    tiles:Array.from({length:18},(_,y) => (y === 6 ? '#' : '.').repeat(32)),
+    spawn:[140,150], npcs:[{id:'test',name:'镇民',at:[125,116],dialogue:'hello'}],
+    props:[], areas:[], defaultArea:'街道', objective:{npc:'test',text:'交谈',done:'探索'}
+  };
+  const data = {
+    'assets/world.json': {startMap:'street', maps:{street:'./assets/check-map.json'}, dialogues:'./assets/check-lines.json'},
+    'assets/check-map.json': map,
+    'assets/check-lines.json': {hello:['你好。','回见。']}
+  };
+  for (const [path,json] of Object.entries(data)) {
+    await page.route(new URL(path,url).href, route => route.fulfill({json}));
+  }
+  await ready(page);
 }
 
 async function checkLayout(page) {
@@ -35,35 +53,13 @@ async function run() {
   if (shots) await mkdir(shots,{recursive:true});
   const browser = await chromium.launch({executablePath:process.env.CHROME_BIN, headless:true});
   const errors = [];
+  const observe = page => page.on('pageerror',error => { errors.push(error.message); console.error(error); });
   try {
     const desktop = await browser.newContext({viewport:{width:1280,height:800}});
     const page = await desktop.newPage();
-    page.on('pageerror',error => errors.push(error.message));
+    observe(page);
     await ready(page);
-    assert(await page.locator('#interact').isDisabled());
     await snapshot(page,'desktop');
-
-    // Holding up reaches the shop's wall. The player must stay at the shopkeeper's side.
-    await page.keyboard.down('ArrowUp');
-    await page.waitForSelector('#interact:enabled');
-    await page.waitForTimeout(1200);
-    await page.keyboard.up('ArrowUp');
-    assert(await page.locator('#interact').isEnabled(), 'walked through the shop wall');
-    await page.keyboard.press('e');
-    await page.waitForSelector('#conversation[open]');
-    assert.equal(await page.locator('#speaker').textContent(),'店主');
-    await page.locator('#next').click();
-    await page.locator('#next').click();
-    await page.locator('#next').click();
-    assert.equal(await page.locator('#objective-label').textContent(),'自由探索');
-    await page.keyboard.down('ArrowDown');
-    await page.waitForSelector('#interact:disabled');
-    await page.keyboard.up('ArrowDown');
-    await page.keyboard.press('Escape');
-    await page.waitForSelector('#paused[open]');
-    await page.locator('#resume').click();
-    console.log('Desktop movement, collision, range, dialogue and pause passed');
-
     await page.evaluate(async () => {
       await navigator.serviceWorker.ready;
       if (!navigator.serviceWorker.controller) {
@@ -72,16 +68,47 @@ async function run() {
     });
     await desktop.setOffline(true);
     await ready(page);
-    assert(await page.locator('#interact').isDisabled());
-    console.log('Cold offline navigation under the project path passed');
+    console.log('Cold offline navigation of the actual game under the project path passed');
     await desktop.close();
 
-    const mobile = await browser.newContext({viewport:{width:390,height:844}, isMobile:true, hasTouch:true, deviceScaleFactor:1});
+    const keyboard = await browser.newContext({serviceWorkers:'block'});
+    const walk = await keyboard.newPage();
+    observe(walk);
+    await enterFixture(walk);
+    assert(await walk.locator('#interact').isDisabled());
+    await walk.keyboard.down('ArrowUp');
+    await walk.waitForSelector('#interact:enabled');
+    // Holding up must leave the player beside the NPC, stopped by the stone wall.
+    await walk.waitForTimeout(1200);
+    await walk.keyboard.up('ArrowUp');
+    assert(await walk.locator('#interact').isEnabled(),'walked through the wall');
+    await walk.keyboard.press('e');
+    await walk.waitForSelector('#conversation[open]');
+    assert.equal(await walk.locator('#speaker').textContent(),'镇民');
+    await walk.locator('#next').click();
+    await walk.locator('#next').click();
+    assert.equal(await walk.locator('#objective-text').textContent(),'探索');
+    await walk.keyboard.down('ArrowDown');
+    await walk.waitForSelector('#interact:disabled');
+    await walk.keyboard.up('ArrowDown');
+    await walk.keyboard.press('Escape');
+    await walk.waitForSelector('#paused[open]');
+    await walk.locator('#resume').click();
+    console.log('Keyboard movement, wall collision, range, dialogue and pause passed');
+    await keyboard.close();
+
+    const mobile = await browser.newContext({viewport:{width:390,height:844}, isMobile:true, hasTouch:true, deviceScaleFactor:1, serviceWorkers:'block'});
     const phone = await mobile.newPage();
-    phone.on('pageerror',error => errors.push(error.message));
+    observe(phone);
     await ready(phone);
     await checkLayout(phone);
     await snapshot(phone,'portrait');
+    await phone.setViewportSize({width:844,height:390});
+    await checkLayout(phone);
+    await snapshot(phone,'landscape');
+    await phone.setViewportSize({width:390,height:844});
+    await enterFixture(phone);
+    await checkLayout(phone);
     const cdp = await mobile.newCDPSession(phone);
     const pad = await phone.locator('#joystick').boundingBox();
     const x = pad.x+pad.width/2, y = pad.y+pad.height/2;
@@ -94,7 +121,6 @@ async function run() {
     await phone.locator('#close-talk').tap();
     await phone.setViewportSize({width:844,height:390});
     await checkLayout(phone);
-    await snapshot(phone,'landscape');
     await phone.locator('#interact').tap();
     await phone.waitForSelector('#conversation[open]');
     assert.deepEqual(errors,[]);

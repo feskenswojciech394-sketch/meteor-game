@@ -41,6 +41,7 @@ jobs:
           trap 'kill "$server_pid"' EXIT
           node tests/smoke.cjs http://127.0.0.1:8765/meteor-game/
       - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
         with:
           name: browser-screens
           path: ${{ runner.temp }}/meteor-screens

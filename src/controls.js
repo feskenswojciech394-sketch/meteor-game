@@ -29,9 +29,6 @@ export class GameUI {
     document.getElementById('close-talk').addEventListener('click', () => this.talk.close());
     document.getElementById('pause').addEventListener('click', () => this.openPause());
     document.getElementById('resume').addEventListener('click', () => this.pause.close());
-    for (const dialog of [this.talk, this.pause]) {
-      dialog.addEventListener('close', () => this.resetInput());
-    }
     window.addEventListener('blur', () => this.resetInput());
     document.addEventListener('visibilitychange', () => {
       if (document.hidden) this.resetInput();
