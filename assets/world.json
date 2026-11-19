@@ -1,0 +1,7 @@
+{
+  "startMap": "main-street",
+  "maps": {
+    "main-street": "./assets/maps/main-street.json"
+  },
+  "dialogues": "./assets/dialogues/town.json"
+}

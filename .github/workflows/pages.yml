@@ -1,0 +1,54 @@
+name: Deploy game to GitHub Pages
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Stage game files
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages/meteor-game"
+          cp -R index.html manifest.json sw.js src assets "$RUNNER_TEMP/pages/meteor-game/"
+          sed -i "s/^const BUILD = 'development';/const BUILD = '$GITHUB_SHA';/" "$RUNNER_TEMP/pages/meteor-game/sw.js"
+      - name: Check controls, phone layouts and offline startup
+        env:
+          NODE_PATH: ${{ runner.temp }}/meteor-qa/node_modules
+          METEOR_QA_SHOTS: ${{ runner.temp }}/meteor-screens
+        run: |
+          npm install --prefix "$RUNNER_TEMP/meteor-qa" --ignore-scripts --no-package-lock playwright-core@1.56.1
+          export CHROME_BIN="$(command -v google-chrome)"
+          python3 -m http.server 8765 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages" > "$RUNNER_TEMP/meteor-http.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          node tests/smoke.cjs http://127.0.0.1:8765/meteor-game/
+      - uses: actions/upload-artifact@v4
+        with:
+          name: browser-screens
+          path: ${{ runner.temp }}/meteor-screens
+          retention-days: 1
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: ${{ runner.temp }}/pages/meteor-game
+      - name: Publish
+        id: deployment
+        uses: actions/deploy-pages@v4

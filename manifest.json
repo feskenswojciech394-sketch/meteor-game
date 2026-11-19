@@ -1,0 +1,18 @@
+{
+  "id": "./",
+  "name": "METEOR · 坠星小镇",
+  "short_name": "坠星小镇",
+  "description": "在主街探索，和杂货店店主聊聊天。",
+  "lang": "zh-CN",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#171c18",
+  "theme_color": "#171c18",
+  "icons": [
+    {"src": "./assets/icons/meteor-192.png", "sizes": "192x192", "type": "image/png", "purpose": "any"},
+    {"src": "./assets/icons/meteor-512.png", "sizes": "512x512", "type": "image/png", "purpose": "any"},
+    {"src": "./assets/icons/meteor-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable"}
+  ]
+}

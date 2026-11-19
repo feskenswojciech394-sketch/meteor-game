@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#171c18">
+  <meta name="description" content="在陨石坠落当天的清晨，沿着主街走到杂货店，和店主打个招呼。">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <title>METEOR · 坠星小镇</title>
+  <link rel="icon" href="./assets/icons/meteor-192.png" type="image/png">
+  <link rel="apple-touch-icon" href="./assets/icons/meteor-192.png">
+  <link rel="manifest" href="./manifest.json">
+  <link rel="stylesheet" href="./src/style.css">
+  <script defer src="./assets/vendor/phaser-arcade-physics-3.90.0.min.js"></script>
+  <script type="module" src="./src/main.js"></script>
+</head>
+<body>
+  <header class="topbar">
+    <div class="bar-inner">
+      <div class="brand" aria-label="METEOR 坠星小镇">
+        <canvas class="brand-mark" data-icon="meteor" aria-hidden="true"></canvas>
+        <canvas class="wordmark" data-icon="wordmark" aria-hidden="true"></canvas>
+        <span class="brand-name">坠星小镇</span>
+      </div>
+      <div class="toolbar">
+        <button class="tool" id="pause" type="button" aria-label="暂停游戏" title="暂停游戏（Esc）" disabled><canvas data-icon="pause" aria-hidden="true"></canvas></button>
+        <button class="tool" id="fullscreen" type="button" aria-label="全屏" title="全屏" aria-pressed="false"><canvas data-icon="expand" aria-hidden="true"></canvas></button>
+      </div>
+    </div>
+  </header>
+
+  <main class="console">
+    <div class="scene-heading">
+      <div>
+        <div class="chapter"><span class="chapter-mark" aria-hidden="true"></span><span id="chapter">序章</span><span class="slash">/</span><span id="day">坠落当天</span></div>
+        <h1 id="map-name">主街与杂货店</h1>
+      </div>
+      <div class="time"><canvas data-icon="sun" aria-hidden="true"></canvas><span id="time-label">上午</span></div>
+    </div>
+
+    <section class="instrument" aria-label="游戏画面和操作区">
+      <div class="frame">
+        <div id="game" role="img" aria-label="俯视角像素地图。用方向键或虚拟摇杆移动，走近店主后交谈。"></div>
+        <div class="objective" id="objective" hidden>
+          <canvas data-icon="flag" aria-hidden="true"></canvas>
+          <div><span class="objective-label" id="objective-label">当前目标</span><strong id="objective-text" aria-live="polite"></strong></div>
+        </div>
+        <div class="compass" aria-label="上方是北"><span aria-hidden="true">N</span><canvas data-icon="compass" aria-hidden="true"></canvas></div>
+        <div class="load-panel" id="loading" role="status">
+          <span id="loading-text">正在进入小镇…</span>
+          <button class="filled" id="retry" type="button" hidden>重新载入</button>
+        </div>
+      </div>
+      <div class="deck">
+        <div class="movement">
+          <div class="keys" aria-hidden="true"><kbd>↑</kbd><kbd>←</kbd><kbd>↓</kbd><kbd>→</kbd></div>
+          <div id="joystick" class="joystick" aria-label="虚拟移动摇杆">
+            <i class="tick north"></i><i class="tick east"></i><i class="tick south"></i><i class="tick west"></i><span id="stick"></span>
+          </div>
+          <div class="control-copy"><strong class="keyboard-label">方向键移动</strong><strong class="touch-label">摇杆移动</strong><small id="location" aria-live="polite">主街</small></div>
+        </div>
+        <div class="interaction">
+          <span class="hint" id="talk-hint" aria-live="polite">走近店主即可交谈</span>
+          <button class="talk-button" id="interact" aria-describedby="talk-hint" type="button" disabled><canvas data-icon="chat" aria-hidden="true"></canvas><span>交谈</span><kbd>E</kbd></button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <dialog id="conversation" aria-labelledby="speaker" aria-describedby="line">
+    <div class="dialog-head"><div class="speaker"><canvas id="portrait" width="24" height="24" aria-hidden="true"></canvas><h2 id="speaker"></h2></div><button class="tool close" id="close-talk" aria-label="结束交谈" type="button"><canvas data-icon="close" aria-hidden="true"></canvas></button></div>
+    <p id="line" aria-live="polite"></p>
+    <div class="dialog-foot"><span id="line-count"></span><button class="filled" id="next" type="button">继续</button></div>
+  </dialog>
+
+  <dialog id="paused" aria-labelledby="pause-title">
+    <canvas class="pause-symbol" data-icon="pause" aria-hidden="true"></canvas>
+    <h2 id="pause-title">已暂停</h2>
+    <button class="filled" id="resume" type="button">继续探索</button>
+  </dialog>
+  <noscript>请启用 JavaScript 进入小镇。</noscript>
+</body>
+</html>
