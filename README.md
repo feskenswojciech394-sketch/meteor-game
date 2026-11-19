@@ -2,7 +2,7 @@
 
 Phaser 3 + 原生 JavaScript 写成的俯视角像素游戏原型。场景取自仓库的序章设定。陨石坠落当天的上午，杂货店店员沿主街去和店主打招呼。
 
-[手机试玩](https://feskenswojciech394-sketch.github.io/meteor-game/) · [查看部署记录](https://github.com/feskenswojciech394-sketch/meteor-game/actions/workflows/pages.yml)
+[手机试玩（Pages 发布后生效）](https://feskenswojciech394-sketch.github.io/meteor-game/) · [查看部署记录](https://github.com/feskenswojciech394-sketch/meteor-game/actions/workflows/pages.yml)
 
 ## 运行与操作
 
@@ -42,4 +42,4 @@ python3 -m http.server 8000
 
 在仓库 **Settings → Pages → Build and deployment → Source** 选择 **GitHub Actions**。私有仓库需要支持私有仓库 Pages 的 GitHub 套餐。推送到 `main` 或在 Actions 中手动运行 **Deploy game to GitHub Pages** 即可发布。
 
-工作流先用 Chromium 检查移动碰撞、手机横竖屏、交谈和离线启动，再发布 `index.html`、`manifest.json`、`sw.js`、`src/` 和 `assets/`。每次发布用提交 SHA 区分缓存版本。关掉旧游戏窗口后重新进入即可使用新版本。新增 JS、CSS 或其他固定资源时，将路径加入 `sw.js` 的 `CORE`。
+工作流先用 Chromium 检查移动碰撞、手机横竖屏、交谈和离线启动，再发布 `index.html`、`manifest.json`、`sw.js`、`src/` 和 `assets/`。如果首次运行时 Pages 尚未启用，选好部署来源后可在当次运行页面点击 **Re-run failed jobs**。每次发布用提交 SHA 区分缓存版本。关掉旧游戏窗口后重新进入即可使用新版本。新增 JS、CSS 或其他固定资源时，将路径加入 `sw.js` 的 `CORE`。

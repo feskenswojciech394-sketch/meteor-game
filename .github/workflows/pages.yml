@@ -13,15 +13,9 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  deploy:
+  check:
+    name: Check and package the game
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pages: write
-      id-token: write
-    environment:
-      name: github-pages
-      url: ${{ steps.deployment.outputs.page_url }}
     steps:
       - uses: actions/checkout@v4
       - name: Stage game files
@@ -47,10 +41,22 @@ jobs:
           name: browser-screens
           path: ${{ runner.temp }}/meteor-screens
           retention-days: 1
-      - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v3
         with:
           path: ${{ runner.temp }}/pages/meteor-game
+
+  deploy:
+    name: Publish to GitHub Pages
+    needs: check
+    runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - uses: actions/configure-pages@v5
       - name: Publish
         id: deployment
         uses: actions/deploy-pages@v4
