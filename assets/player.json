@@ -1,0 +1,12 @@
+{
+  "image": null,
+  "frameWidth": 20,
+  "frameHeight": 26,
+  "stridePixels": 20.8,
+  "directions": {
+    "down":  {"idle": 0, "walk": [1, 2]},
+    "left":  {"idle": 3, "walk": [4, 5]},
+    "right": {"idle": 6, "walk": [7, 8]},
+    "up":    {"idle": 9, "walk": [10, 11]}
+  }
+}

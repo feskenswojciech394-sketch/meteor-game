@@ -24,6 +24,7 @@ python3 -m http.server 8000
 | `src/main.js`、`src/controls.js` | 读入数据、启动 Phaser、处理键盘和摇杆 |
 | `src/scenes/TownScene.js` | 场景、碰撞、镜头和交谈距离 |
 | `src/art/` | 用矩形色块绘制地面、房屋、树木、角色和图标 |
+| `assets/player.json` | 主角图集、四向站立和行走帧、每个步态循环的距离 |
 | `assets/world.json`、`assets/maps/` | 地图索引与地图数据 |
 | `assets/dialogues/town.json` | 对话 ID 对应的逐句台词 |
 | `assets/vendor/`、`assets/icons/` | Phaser 3.90.0 Arcade Physics 发行版及其 MIT 许可、PWA 图标 |
@@ -37,6 +38,12 @@ python3 -m http.server 8000
 - **画地形**　`tiles` 每行等宽，一格 16×16 像素。`.` 是草，`=` 是路，`#` 是可碰撞的石墙，`~` 是水。坐标从左上角向右、向下递增。`spawn`、NPC 的 `at` 和 `props` 都使用原始地图像素，以脚底为锚点。`props` 条目形如 `["oak", 80, 120]`。围栏多一个长度参数，例如 `["fence", 96, 80, 4]`。其他种类及碰撞范围见 `src/art/scenery.js`。
 - **新增 NPC**　在地图的 `npcs` 数组中加入唯一 ID、显示名、可到达的坐标及对话 ID。例如 `{"id":"neighbor","name":"邻居","at":[285,150],"dialogue":"neighbor-hello"}`。当附近有多人时，「交谈」会选择视线可达且距离最近的一位。地图的 `objective.npc` 可指向其中一人，完整读完对白会切换为 `objective.done` 的文字。
 - **新增或修改对话**　在 `assets/dialogues/town.json` 里加上 `"neighbor-hello": ["早啊！", "今天的街上真安静。"]`。数组顺序就是播放顺序。修改此文件即可调整剧情。
+
+### 更换主角动画
+
+`assets/player.json` 的 `image` 为 `null` 时使用现有色块角色。换素材时，将等格 PNG 图集放进 `assets/`，把 `image` 设为项目相对路径（例如 `./assets/actors/hero.png`），并填写每格的 `frameWidth` 和 `frameHeight`。角色脚底对齐每格下边缘中央。游戏和离线缓存都会读取这个路径。
+
+`directions` 为 `down`、`left`、`right`、`up` 分别指定站立帧 `idle` 和行走序列 `walk`。帧号从 0 开始，按从左到右、从上到下排列。比如 `"walk": [1, 0, 2, 0]` 会按四帧循环。各方向的帧数可以不同。`stridePixels` 表示播完一个循环要走过的地图像素数，轻推摇杆时步伐也会放慢。
 
 ## GitHub Pages
 

@@ -60,6 +60,44 @@ export function actorTexture(role, facing = 'down', step = 0) {
   return ctx.canvas;
 }
 
+const directions = ['down', 'left', 'right', 'up'];
+
+function placeholderSheet() {
+  const ctx = surface(3 * 20, directions.length * 26);
+  directions.forEach((direction, row) => {
+    for (const step of [0, 1, 2]) {
+      ctx.drawImage(actorTexture('hero', direction, step), step * 20, row * 26);
+    }
+  });
+  return ctx.canvas;
+}
+
+export async function loadPlayerArt(config) {
+  let sheet;
+  if (config.image) {
+    sheet = new Image();
+    sheet.src = config.image;
+    await sheet.decode();
+  } else {
+    sheet = placeholderSheet();
+  }
+
+  const {frameWidth, frameHeight, stridePixels} = config;
+  if (![frameWidth, frameHeight].every(n => Number.isInteger(n) && n > 0) ||
+      !Number.isFinite(stridePixels) || stridePixels <= 0) {
+    throw new Error('assets/player.json: invalid frame dimensions or stridePixels');
+  }
+  const frameCount = Math.floor(sheet.width / frameWidth) * Math.floor(sheet.height / frameHeight);
+  const validFrame = n => Number.isInteger(n) && n >= 0 && n < frameCount;
+  for (const direction of directions) {
+    const pose = config.directions?.[direction];
+    if (!validFrame(pose?.idle) || !Array.isArray(pose.walk) || !pose.walk.length || !pose.walk.every(validFrame)) {
+      throw new Error('assets/player.json: invalid frames for ' + direction);
+    }
+  }
+  return {...config, sheet};
+}
+
 export function talkBubble() {
   const ctx = surface(15,12);
   blocks(ctx,'#3a4c3c',[2,0,11,1],[0,2,15,6],[1,1,13,8],[3,9,8,1],[5,10,3,1],[5,11,1,1]);

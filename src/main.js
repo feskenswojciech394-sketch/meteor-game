@@ -1,5 +1,5 @@
 import { drawIcons } from './art/icons.js';
-import { drawPortrait } from './art/actors.js';
+import { drawPortrait, loadPlayerArt } from './art/actors.js';
 import { GameUI } from './controls.js';
 
 async function readJSON(path) {
@@ -43,8 +43,9 @@ async function enterTown() {
   const world = await readJSON('./assets/world.json');
   const selected = new URLSearchParams(location.search).get('map') ?? world.startMap;
   if (!Object.hasOwn(world.maps, selected)) throw new Error('找不到地图 ' + selected);
-  const [map,dialogues,{TownScene}] = await Promise.all([
-    readJSON(world.maps[selected]), readJSON(world.dialogues), import('./scenes/TownScene.js')
+  const [map, dialogues, playerArt, {TownScene}] = await Promise.all([
+    readJSON(world.maps[selected]), readJSON(world.dialogues),
+    readJSON('./assets/player.json').then(loadPlayerArt), import('./scenes/TownScene.js')
   ]);
   for (const person of map.npcs) {
     if (!Array.isArray(dialogues[person.dialogue]) || !dialogues[person.dialogue].length) {
@@ -59,11 +60,12 @@ async function enterTown() {
     backgroundColor: '#829e5a',
     pixelArt: true,
     roundPixels: true,
+    fps: { smoothStep: false },
     audio: { noAudio:true },
     scale: { mode:Phaser.Scale.RESIZE, width:'100%', height:'100%' },
     input: { keyboard:false, mouse:false, touch:false },
-    physics: { default:'arcade', arcade:{ gravity:{x:0,y:0} } },
-    scene: [new TownScene(map,ui)]
+    physics: { default:'arcade', arcade:{ gravity:{x:0,y:0}, fixedStep:true, fps:60, customUpdate:true } },
+    scene: [new TownScene(map, ui, playerArt)]
   });
   const observer = new ResizeObserver(() => { if (game.isBooted) game.scale.refresh(); });
   observer.observe(document.getElementById('game'));

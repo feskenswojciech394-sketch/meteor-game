@@ -2,6 +2,7 @@ const assert = require('node:assert/strict');
 const { mkdir } = require('node:fs/promises');
 const { join } = require('node:path');
 const { chromium } = require('playwright-core');
+const { checkMovement } = require('./movement.cjs');
 
 const url = process.argv[2];
 const shots = process.env.METEOR_QA_SHOTS;
@@ -126,6 +127,8 @@ async function run() {
     await phone.waitForSelector('#conversation[open]');
     assert.deepEqual(errors,[]);
     console.log('Touch joystick, portrait, landscape rotation and tap-to-talk passed');
+    await mobile.close();
+    await checkMovement(browser, url, enterFixture);
   } finally {
     await browser.close();
   }

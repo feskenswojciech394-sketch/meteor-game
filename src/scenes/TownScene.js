@@ -5,12 +5,22 @@ import { blocks, surface } from '../art/pixels.js';
 
 const WALK_SPEED = 67;
 const TALK_RADIUS = 27;
+const CAMERA_LERP = 0.1; // per 60 Hz physics tick
+const MAX_CATCHUP_MS = 250;
+
+function drawCoordinate(previous, current, alpha, scroll) {
+  // A stationary foot stays on one world pixel while the camera finishes easing.
+  if (previous === current) return Math.round(current);
+  const world = Phaser.Math.Linear(previous, current, alpha);
+  return Math.round(scroll) + Math.round(world - scroll);
+}
 
 export class TownScene extends Phaser.Scene {
-  constructor(map, ui) {
+  constructor(map, ui, playerArt) {
     super('town');
     this.map = map;
     this.ui = ui;
+    this.playerArt = playerArt;
   }
 
   create() {
@@ -35,11 +45,21 @@ export class TownScene extends Phaser.Scene {
     this.body = this.walker.body;
     this.body.setCollideWorldBounds(true);
     this.physics.add.collider(this.walker,this.solids);
-    this.ui.onStop = () => this.body.stop();
     this.facing = 'down';
-    this.walkTime = 0;
-    this.player = this.add.image(...spawn,'hero-down-0').setOrigin(.5,1);
+    this.strideDistance = 0;
+    this.player = this.add.image(...spawn, 'hero', this.playerArt.directions.down.idle).setOrigin(.5,1);
     this.marker = this.add.image(...spawn,'player-marker').setOrigin(.5,1);
+    this.stepMs = 1000 / this.physics.world.fps;
+    this.remainderMs = 0;
+    this.previousFeet = new Phaser.Math.Vector2(...spawn);
+    this.scroll = new Phaser.Math.Vector2();
+    this.previousScroll = new Phaser.Math.Vector2();
+    this.scrollTarget = new Phaser.Math.Vector2();
+    this.ui.onStop = () => {
+      this.body.stop();
+      this.previousFeet.set(this.body.center.x, this.body.bottom);
+      this.stand();
+    };
 
     this.people = npcs.map(person => {
       const [x,y] = person.at;
@@ -51,8 +71,11 @@ export class TownScene extends Phaser.Scene {
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
     this.resize();
     this.scale.on('resize',this.resize,this);
-    this.events.once('shutdown',() => this.scale.off('resize',this.resize,this));
-    this.renderPlayer(0,0);
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', this.resize, this);
+      this.ui.onStop = null;
+    });
+    this.update(0, 0);
     document.getElementById('pause').disabled = false;
     document.getElementById('loading').hidden = true;
   }
@@ -77,9 +100,7 @@ export class TownScene extends Phaser.Scene {
   }
 
   createActors() {
-    for (const direction of ['down','up','left','right']) {
-      for (const step of [0,1,2]) this.textures.addCanvas('hero-'+direction+'-'+step,actorTexture('hero',direction,step));
-    }
+    this.textures.addSpriteSheet('hero', this.playerArt.sheet, this.playerArt);
     this.textures.addCanvas('keeper',actorTexture('keeper'));
     this.textures.addCanvas('talk-bubble',talkBubble());
     const ctx = surface(9,6);
@@ -90,16 +111,14 @@ export class TownScene extends Phaser.Scene {
 
   resize() {
     const camera = this.cameras.main;
+    if (this.viewWidth === camera.width && this.viewHeight === camera.height) return;
+    this.viewWidth = camera.width;
+    this.viewHeight = camera.height;
     const zoom = Math.max(camera.width/this.worldWidth, camera.height/this.worldHeight);
-    camera.setZoom(zoom);
-    this.followPlayer();
-  }
-
-  followPlayer() {
-    const camera = this.cameras.main;
-    const visibleHeight = camera.height / camera.zoom;
-    const lookAhead = Phaser.Math.Clamp(235 - visibleHeight, 22, 42);
-    camera.centerOn(this.body.center.x,this.body.bottom-lookAhead);
+    camera.setZoom(zoom).setRoundPixels(true);
+    this.lookAhead = Phaser.Math.Clamp(235 - camera.height / zoom, 22, 42);
+    camera.getScroll(this.body.center.x, this.body.bottom - this.lookAhead, this.scroll);
+    this.previousScroll.copy(this.scroll);
   }
 
   nearestPerson(x,y) {
@@ -116,29 +135,72 @@ export class TownScene extends Phaser.Scene {
     return closest;
   }
 
-  renderPlayer(time,delta) {
-    const {x,y} = this.body.velocity;
-    const walking = Math.abs(x)+Math.abs(y) > 1;
-    if (walking) {
-      this.facing = Math.abs(x) > Math.abs(y) ? (x < 0 ? 'left':'right') : (y < 0 ? 'up':'down');
-      this.walkTime += delta;
-    } else this.walkTime = 0;
-    const step = walking ? 1+Math.floor(this.walkTime/155)%2 : 0;
-    const px = Math.round(this.body.center.x), py = Math.round(this.body.bottom);
-    this.player.setPosition(px,py).setDepth(py+.1).setTexture('hero-'+this.facing+'-'+step);
-    this.marker.setPosition(px,py-28).setDepth(py+.2);
+  stand() {
+    this.strideDistance = 0;
+    this.showFrame(this.playerArt.directions[this.facing].idle);
+  }
+
+  showFrame(frame) {
+    if (this.player.frame.name !== frame) this.player.setFrame(frame);
+  }
+
+  advancePose(distance) {
+    if (distance < 1e-6) {
+      this.stand();
+      return;
+    }
+    const frames = this.playerArt.directions[this.facing].walk;
+    const stride = this.playerArt.stridePixels;
+    this.strideDistance = (this.strideDistance + distance) % stride;
+    this.showFrame(frames[Math.floor(this.strideDistance / stride * frames.length)]);
+  }
+
+  stepPlayer() {
+    const input = this.ui.direction(this.stepMs);
+    if (input.x || input.y) {
+      const horizontal = Math.abs(input.x) > Math.abs(input.y);
+      this.facing = horizontal ? (input.x < 0 ? 'left' : 'right') : (input.y < 0 ? 'up' : 'down');
+    }
+    this.previousFeet.set(this.body.center.x, this.body.bottom);
+    this.body.setVelocity(input.x * WALK_SPEED, input.y * WALK_SPEED);
+    // Arcade integrates velocity and resolves collisions before we measure the step.
+    this.physics.world.singleStep();
+    const x = this.body.center.x, y = this.body.bottom;
+    this.advancePose(Math.hypot(x - this.previousFeet.x, y - this.previousFeet.y));
+
+    this.previousScroll.copy(this.scroll);
+    this.cameras.main.getScroll(x, y - this.lookAhead, this.scrollTarget);
+    this.scroll.lerp(this.scrollTarget, CAMERA_LERP);
+  }
+
+  renderPlayer(alpha) {
+    const lerp = Phaser.Math.Linear;
+    const sx = lerp(this.previousScroll.x, this.scroll.x, alpha);
+    const sy = lerp(this.previousScroll.y, this.scroll.y, alpha);
+    this.cameras.main.setScroll(Math.round(sx), Math.round(sy));
+    // Snap the screen-space displacement once so the player and camera share a pixel grid.
+    const px = drawCoordinate(this.previousFeet.x, this.body.center.x, alpha, sx);
+    const py = drawCoordinate(this.previousFeet.y, this.body.bottom, alpha, sy);
+    this.player.setPosition(px, py).setDepth(py + .1);
+    this.marker.setPosition(px, py - this.player.height - 2).setDepth(py + .2);
+  }
+
+  update(time, delta) {
+    // Keep the fractional tick for rendering. Limit catch-up after a suspended tab.
+    this.remainderMs += Math.min(delta, MAX_CATCHUP_MS);
+    while (this.remainderMs + 1e-8 >= this.stepMs) {
+      this.stepPlayer();
+      this.remainderMs -= this.stepMs;
+    }
+    this.remainderMs = Math.max(0, this.remainderMs);
+    this.renderPlayer(this.remainderMs / this.stepMs);
+
     const bob = this.reducedMotion || this.ui.blocked ? 0 : Math.round(Math.sin(time/380));
     for (const {person,bubble} of this.people) bubble.y = person.at[1]-27+bob;
+    const px = Math.round(this.body.center.x), py = Math.round(this.body.bottom);
     const nearby = this.nearestPerson(px,py);
     if (nearby !== this.ui.nearby) this.ui.setNearby(nearby);
     const area = this.map.areas.find(({rect:[x,y,w,h]}) => px >= x && py >= y && px < x+w && py < y+h);
     this.ui.setArea(area?.name ?? this.map.defaultArea);
-    this.followPlayer();
-  }
-
-  update(time,delta) {
-    const input = this.ui.direction();
-    this.body.setVelocity(input.x*WALK_SPEED,input.y*WALK_SPEED);
-    this.renderPlayer(time,delta);
   }
 }

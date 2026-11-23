@@ -2,13 +2,14 @@ const BUILD = 'development';
 const PREFIX = 'meteor-town:' + self.registration.scope + ':';
 const CACHE = PREFIX + BUILD;
 const ENTRY = new URL('./index.html', self.registration.scope).href;
+const PLAYER = './assets/player.json';
 const CORE = [
   './index.html', './manifest.json', './src/style.css', './src/main.js',
   './src/controls.js', './src/scenes/TownScene.js', './src/art/pixels.js',
   './src/art/terrain.js', './src/art/scenery.js', './src/art/actors.js', './src/art/icons.js',
   './assets/vendor/phaser-arcade-physics-3.90.0.min.js',
   './assets/fonts/town-regular.woff2', './assets/fonts/town-bold.woff2',
-  './assets/icons/meteor-192.png', './assets/icons/meteor-512.png', './assets/world.json'
+  './assets/icons/meteor-192.png', './assets/icons/meteor-512.png', './assets/world.json', PLAYER
 ];
 
 self.addEventListener('install', event => {
@@ -17,7 +18,10 @@ self.addEventListener('install', event => {
     const fresh = path => new Request(new URL(path,self.registration.scope), {cache:'reload'});
     await cache.addAll(CORE.map(fresh));
     const registry = await (await cache.match(fresh('./assets/world.json'))).json();
-    await cache.addAll([...new Set([registry.dialogues,...Object.values(registry.maps)])].map(fresh));
+    const player = await (await cache.match(fresh(PLAYER))).json();
+    const assets = new Set([registry.dialogues, ...Object.values(registry.maps)]);
+    if (player.image) assets.add(player.image);
+    await cache.addAll(Array.from(assets, fresh));
   })());
 });
 
