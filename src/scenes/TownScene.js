@@ -7,12 +7,24 @@ const WALK_SPEED = 67;
 const TALK_RADIUS = 27;
 const CAMERA_LERP = 0.1; // per 60 Hz physics tick
 const MAX_CATCHUP_MS = 250;
+const FACING_AXIS_RATIO = 1.25;
 
-function drawCoordinate(previous, current, alpha, scroll) {
-  // A stationary foot stays on one world pixel while the camera finishes easing.
-  if (previous === current) return Math.round(current);
-  const world = Phaser.Math.Linear(previous, current, alpha);
-  return Math.round(scroll) + Math.round(world - scroll);
+function facingDirection({x, y, analog}, previous) {
+  const ax = Math.abs(x), ay = Math.abs(y);
+  if (!ax && !ay) return previous;
+  let horizontal = ax > ay;
+  // A finger can cross 45 degrees repeatedly during one steady diagonal.
+  if (analog && Math.max(ax, ay) <= Math.min(ax, ay) * FACING_AXIS_RATIO) {
+    horizontal = previous === 'left' || previous === 'right';
+  }
+  return horizontal ? (x < 0 ? 'left' : 'right') : (y < 0 ? 'up' : 'down');
+}
+
+function drawCoordinate(previous, current, alpha, scale, scroll) {
+  // Keep a resting foot anchored to the scenery while the camera settles.
+  if (previous === current) return Math.round(current * scale);
+  const projected = Phaser.Math.Linear(previous, current, alpha) * scale;
+  return Math.round(scroll) + Math.round(projected - scroll);
 }
 
 export class TownScene extends Phaser.Scene {
@@ -28,9 +40,10 @@ export class TownScene extends Phaser.Scene {
     this.worldWidth = tiles[0].length * tileSize;
     this.worldHeight = tiles.length * tileSize;
     this.physics.world.setBounds(0,0,this.worldWidth,this.worldHeight);
-    this.cameras.main.setBounds(0,0,this.worldWidth,this.worldHeight);
+    this.cameras.main.setOrigin(0,0).setRoundPixels(true);
+    this.sceneryImages = [];
     this.textures.addCanvas('ground', terrainTexture(this.map));
-    this.add.image(0,0,'ground').setOrigin(0).setDepth(-100);
+    this.addMapImage(0,0,'ground').setOrigin(0).setDepth(-100);
     this.solids = this.physics.add.staticGroup();
     this.barriers = [];
     tiles.forEach((row,y) => [...row].forEach((tile,x) => {
@@ -63,9 +76,9 @@ export class TownScene extends Phaser.Scene {
 
     this.people = npcs.map(person => {
       const [x,y] = person.at;
-      this.add.image(x,y,'keeper').setOrigin(.5,1).setDepth(y);
+      this.addMapImage(x,y,'keeper').setOrigin(.5,1).setDepth(y);
       this.addSolid(x-5,y-5,10,5,person.id);
-      const bubble = this.add.image(x,y-27,'talk-bubble').setOrigin(.5,1).setDepth(y+.2);
+      const bubble = this.addMapImage(x,y-27,'talk-bubble').setOrigin(.5,1).setDepth(y+.2);
       return {person,bubble};
     });
     this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -85,12 +98,18 @@ export class TownScene extends Phaser.Scene {
     this.barriers.push({rect:new Phaser.Geom.Rectangle(x,y,width,height), owner});
   }
 
+  addMapImage(x, y, texture) {
+    const image = this.add.image(x, y, texture);
+    this.sceneryImages.push({image, x, y});
+    return image;
+  }
+
   addProp([kind,x,y,count]) {
     const definition = scenery[kind];
     const variant = kind === 'fence' ? count : Math.abs(x*7+y*13)%3;
     const key = kind+'-'+variant;
     if (!this.textures.exists(key)) this.textures.addCanvas(key,propTexture(kind,variant));
-    const image = this.add.image(x,y,key).setOrigin(.5,1);
+    const image = this.addMapImage(x,y,key).setOrigin(.5,1);
     image.setDepth(['garden','flowers','reeds'].includes(kind) ? -1 : y);
     const footprint = kind === 'fence' ? [-image.width/2,-11,image.width,9] : definition.body;
     if (footprint) {
@@ -114,11 +133,24 @@ export class TownScene extends Phaser.Scene {
     if (this.viewWidth === camera.width && this.viewHeight === camera.height) return;
     this.viewWidth = camera.width;
     this.viewHeight = camera.height;
-    const zoom = Math.max(camera.width/this.worldWidth, camera.height/this.worldHeight);
-    camera.setZoom(zoom).setRoundPixels(true);
-    this.lookAhead = Phaser.Math.Clamp(235 - camera.height / zoom, 22, 42);
-    camera.getScroll(this.body.center.x, this.body.bottom - this.lookAhead, this.scroll);
+    // Phaser Canvas rounds positions before camera zoom. Project the art at resize
+    // so the camera's integer scroll advances one canvas pixel at a time.
+    const scale = Math.max(camera.width / this.worldWidth, camera.height / this.worldHeight);
+    this.mapScale = scale;
+    camera.setBounds(0, 0, Math.round(this.worldWidth * scale), Math.round(this.worldHeight * scale));
+    for (const {image, x, y} of this.sceneryImages) {
+      image.setScale(scale).setPosition(Math.round(x * scale), Math.round(y * scale));
+    }
+    this.player.setScale(scale);
+    this.marker.setScale(scale);
+    this.lookAhead = Phaser.Math.Clamp(235 - camera.height / scale, 22, 42);
+    this.getFollowTarget(this.scroll);
     this.previousScroll.copy(this.scroll);
+  }
+
+  getFollowTarget(out) {
+    this.cameras.main.getScroll(this.body.center.x * this.mapScale,
+      (this.body.bottom - this.lookAhead) * this.mapScale, out);
   }
 
   nearestPerson(x,y) {
@@ -157,10 +189,7 @@ export class TownScene extends Phaser.Scene {
 
   stepPlayer() {
     const input = this.ui.direction(this.stepMs);
-    if (input.x || input.y) {
-      const horizontal = Math.abs(input.x) > Math.abs(input.y);
-      this.facing = horizontal ? (input.x < 0 ? 'left' : 'right') : (input.y < 0 ? 'up' : 'down');
-    }
+    this.facing = facingDirection(input, this.facing);
     this.previousFeet.set(this.body.center.x, this.body.bottom);
     this.body.setVelocity(input.x * WALK_SPEED, input.y * WALK_SPEED);
     // Arcade integrates velocity and resolves collisions before we measure the step.
@@ -169,7 +198,7 @@ export class TownScene extends Phaser.Scene {
     this.advancePose(Math.hypot(x - this.previousFeet.x, y - this.previousFeet.y));
 
     this.previousScroll.copy(this.scroll);
-    this.cameras.main.getScroll(x, y - this.lookAhead, this.scrollTarget);
+    this.getFollowTarget(this.scrollTarget);
     this.scroll.lerp(this.scrollTarget, CAMERA_LERP);
   }
 
@@ -178,11 +207,16 @@ export class TownScene extends Phaser.Scene {
     const sx = lerp(this.previousScroll.x, this.scroll.x, alpha);
     const sy = lerp(this.previousScroll.y, this.scroll.y, alpha);
     this.cameras.main.setScroll(Math.round(sx), Math.round(sy));
-    // Snap the screen-space displacement once so the player and camera share a pixel grid.
-    const px = drawCoordinate(this.previousFeet.x, this.body.center.x, alpha, sx);
-    const py = drawCoordinate(this.previousFeet.y, this.body.bottom, alpha, sy);
-    this.player.setPosition(px, py).setDepth(py + .1);
-    this.marker.setPosition(px, py - this.player.height - 2).setDepth(py + .2);
+    const scale = this.mapScale;
+    const px = drawCoordinate(this.previousFeet.x, this.body.center.x, alpha, scale, sx);
+    const py = drawCoordinate(this.previousFeet.y, this.body.bottom, alpha, scale, sy);
+    this.player.setPosition(px, py);
+    this.marker.setPosition(px, py - Math.round((this.player.height + 2) * scale));
+    const depth = Math.round(lerp(this.previousFeet.y, this.body.bottom, alpha));
+    if (this.player.depth !== depth + .1) {
+      this.player.setDepth(depth + .1);
+      this.marker.setDepth(depth + .2);
+    }
   }
 
   update(time, delta) {
@@ -196,7 +230,7 @@ export class TownScene extends Phaser.Scene {
     this.renderPlayer(this.remainderMs / this.stepMs);
 
     const bob = this.reducedMotion || this.ui.blocked ? 0 : Math.round(Math.sin(time/380));
-    for (const {person,bubble} of this.people) bubble.y = person.at[1]-27+bob;
+    for (const {person,bubble} of this.people) bubble.y = Math.round((person.at[1]-27+bob) * this.mapScale);
     const px = Math.round(this.body.center.x), py = Math.round(this.body.bottom);
     const nearby = this.nearestPerson(px,py);
     if (nearby !== this.ui.nearby) this.ui.setNearby(nearby);

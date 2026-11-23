@@ -1,5 +1,6 @@
 // Drive actual Phaser game frames with a controlled clock. The capture is test-only.
 const assert = require('node:assert/strict');
+const {checkSlowDiagonal} = require('./diagonal.cjs');
 
 function captureGame() {
   Object.defineProperty(window, 'Phaser', {
@@ -19,7 +20,8 @@ function captureGame() {
 }
 
 async function checkMovement(browser, url, enterFixture) {
-  const context = await browser.newContext({viewport:{width:420,height:820}, serviceWorkers:'block'});
+  const context = await browser.newContext({viewport:{width:420,height:820},
+    deviceScaleFactor:2, hasTouch:true, isMobile:true, serviceWorkers:'block'});
   try {
     const page = await context.newPage();
     await page.addInitScript(captureGame);
@@ -64,7 +66,8 @@ async function checkMovement(browser, url, enterFixture) {
           if (i >= hz * .8) cruisingX.push(scene.player.x - camera.scrollX);
         }
         const x = body.center.x, y = body.bottom;
-        const lag = camera.getScroll(x, y - scene.lookAhead).x - camera.scrollX;
+        const scale = scene.player.scaleX;
+        const lag = (camera.getScroll(x * scale, (y - scene.lookAhead) * scale).x - camera.scrollX) / scale;
         key('keydown', 'ArrowDown');
         for (let i = 0; i < hz; i++) frame();
         const dx = body.center.x - x, dy = body.bottom - y;
@@ -124,6 +127,7 @@ async function checkMovement(browser, url, enterFixture) {
     });
     assert.deepEqual(stop, {speed:0, idle:18, drift:0, restingPixels:1});
     console.log('Analog ramp, distance-based gait at half speed, immediate release and zero drift passed');
+    await checkSlowDiagonal(page, reset);
   } finally {
     await context.close();
   }

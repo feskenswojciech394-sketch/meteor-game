@@ -53,22 +53,36 @@ async function enterTown() {
     }
   }
   const ui = new GameUI(map,dialogues);
+  const host = document.getElementById('game');
+  const canvasSize = () => {
+    // A finer grid for slow movement on phones, with a bounded canvas fill cost.
+    const density = Math.min(window.devicePixelRatio || 1, 2);
+    return {
+      width: Math.max(1, Math.round(host.clientWidth * density)),
+      height: Math.max(1, Math.round(host.clientHeight * density))
+    };
+  };
   const game = new Phaser.Game({
     type: Phaser.CANVAS,
-    parent: 'game',
+    parent: host,
     banner: false,
     backgroundColor: '#829e5a',
     pixelArt: true,
     roundPixels: true,
     fps: { smoothStep: false },
     audio: { noAudio:true },
-    scale: { mode:Phaser.Scale.RESIZE, width:'100%', height:'100%' },
+    scale: { mode:Phaser.Scale.FIT, ...canvasSize() },
     input: { keyboard:false, mouse:false, touch:false },
     physics: { default:'arcade', arcade:{ gravity:{x:0,y:0}, fixedStep:true, fps:60, customUpdate:true } },
     scene: [new TownScene(map, ui, playerArt)]
   });
-  const observer = new ResizeObserver(() => { if (game.isBooted) game.scale.refresh(); });
-  observer.observe(document.getElementById('game'));
+  const observer = new ResizeObserver(() => {
+    const {width, height} = canvasSize();
+    if (game.isBooted && (width !== game.scale.width || height !== game.scale.height)) {
+      game.scale.setGameSize(width, height);
+    }
+  });
+  observer.observe(host);
   game.events.once('destroy',() => observer.disconnect());
 }
 

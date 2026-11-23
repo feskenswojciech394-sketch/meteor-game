@@ -7,7 +7,7 @@ export class GameUI {
     this.map = map;
     this.dialogues = dialogues;
     this.keys = new Set();
-    this.stick = { x: 0, y: 0 };
+    this.stick = { x: 0, y: 0, analog: true };
     this.stickTarget = { x: 0, y: 0 };
     this.completed = new Set();
     this.talk = document.getElementById('conversation');
